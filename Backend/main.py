@@ -11,7 +11,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 # 2. CONECTAR A LA BASE DE DATOS
 # Busca la dirección de la base de datos en Render. Si no la encuentra, crea un archivo local.
-if DATABASE_URL.startswith("postgres://"):
+if DATABASE_URL.startswith("postgresql://admin_clima:jx3yYlCx7sFs7zf0EXpN3SzhhEePRCq2@dpg-dbrh84t6e07s73bn2r3g-a/clima_ny9h"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
