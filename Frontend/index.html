@@ -16,6 +16,8 @@
     .tarjeta h3 { margin: 0; font-size: 14px; color: #666; }
     .tarjeta .numero { font-size: 36px; font-weight: bold; margin-top: 10px; color: #111; }
     .caja-grafico { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .leyenda { display: flex; justify-content: center; gap: 25px; margin-bottom: 10px; font-weight: bold; font-size: 14px; }
+    canvas { width: 100%; height: 320px; display: block; }
   </style>
 </head>
 <body>
@@ -39,11 +41,11 @@
   <div class="fila-tarjetas">
     <div class="tarjeta">
       <h3>TEMPERATURA ACTUAL</h3>
-      <div class="numero" id="textoTemp">-- °C</div>
+      <div class="numero" id="textoTemp" style="color: #dc2626;">-- °C</div>
     </div>
     <div class="tarjeta">
       <h3>PRESIÓN ATMOSFÉRICA</h3>
-      <div class="numero" id="textoPres">-- hPa</div>
+      <div class="numero" id="textoPres" style="color: #2563eb;">-- hPa</div>
     </div>
     <div class="tarjeta">
       <h3>HORA DEL ÚLTIMO DATO</h3>
@@ -52,18 +54,17 @@
   </div>
 
   <div class="caja-grafico">
-    <canvas id="miGrafico"></canvas>
+    <div class="leyenda">
+      <span style="color: #dc2626;">● Temperatura (°C)</span>
+      <span style="color: #2563eb;">● Presión (hPa)</span>
+    </div>
+    <canvas id="miGrafico" width="840" height="320"></canvas>
   </div>
 </div>
 
 <script>
-  document.write('<scr' + 'ipt src="https://' + 'cdn.jsdelivr.net' + '/npm/chart.js@4.4.1/dist/chart.umd.min.js"></scr' + 'ipt>');
-</script>
-
-<script>
   const DOMINIO = "://onrender.com";
   const URL_SERVIDOR = "https://" + DOMINIO + "/api/lecturas";
-  let graficoActual = null;
 
   async function pedirDatosAlServidor() {
     const estacionElegida = document.getElementById("menuEstacion").value;
@@ -71,7 +72,7 @@
     estado.textContent = "Conectando con Render...";
 
     try {
-      let direccion = URL_SERVIDOR + "?limite=50";
+      let direccion = URL_SERVIDOR + "?limite=30";
       if (estacionElegida !== "") {
         direccion += "&estacion=" + estacionElegida;
       }
@@ -98,7 +99,7 @@
       document.getElementById("textoHora").textContent = fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
       
       estado.textContent = "En línea • Última lectura de " + ultimoDato.estacion_id + " (" + listaDatos.length + " registros cargados)";
-      actualizarGrafico(listaDatos);
+      dibujarGraficoNativo(listaDatos);
 
     } catch (error) {
       estado.textContent = "Detalle del error: " + error.message;
@@ -106,50 +107,80 @@
     }
   }
 
-  function actualizarGrafico(datos) {
-    const horas = datos.map(item => {
-      const fTexto = item.fecha_hora.endsWith("Z") ? item.fecha_hora : item.fecha_hora + "Z";
-      const f = new Date(fTexto);
-      return f.getHours().toString().padStart(2, '0') + ":" + f.getMinutes().toString().padStart(2, '0');
-    });
-    const temperaturas = datos.map(item => item.temperatura);
-    const presiones = datos.map(item => item.presion);
+  function dibujarGraficoNativo(datos) {
+    const canvas = document.getElementById("miGrafico");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width;
+    const H = canvas.height;
+    const padX = 55;
+    const padY = 30;
 
-    const lienzo = document.getElementById("miGrafico").getContext("2d");
+    ctx.clearRect(0, 0, W, H);
 
-    if (graficoActual !== null) {
-      graficoActual.destroy();
+    const temps = datos.map(d => d.temperatura);
+    const press = datos.map(d => d.presion);
+    const minT = Math.min(...temps) - 0.5;
+    const maxT = Math.max(...temps) + 0.5;
+    const minP = Math.min(...press) - 0.5;
+    const maxP = Math.max(...press) + 0.5;
+
+    // Líneas guía horizontales y etiquetas de ejes
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth = 1;
+    ctx.font = "12px Arial";
+    for (let i = 0; i <= 4; i++) {
+      const y = padY + (i * (H - padY * 2)) / 4;
+      ctx.beginPath();
+      ctx.moveTo(padX, y);
+      ctx.lineTo(W - padX, y);
+      ctx.stroke();
+
+      const valT = (maxT - (i * (maxT - minT)) / 4).toFixed(1);
+      const valP = (maxP - (i * (maxP - minP)) / 4).toFixed(1);
+      ctx.fillStyle = "#dc2626";
+      ctx.fillText(valT + "°", 8, y + 4);
+      ctx.fillStyle = "#2563eb";
+      ctx.fillText(valP, W - padX + 8, y + 4);
     }
 
-    graficoActual = new Chart(lienzo, {
-      type: 'line',
-      data: {
-        labels: horas,
-        datasets: [
-          {
-            label: 'Temperatura (°C)',
-            data: temperaturas,
-            borderColor: '#ef4444',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            yAxisID: 'ejeIzquierdo',
-            tension: 0.3
-          },
-          {
-            label: 'Presión (hPa)',
-            data: presiones,
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            yAxisID: 'ejeDerecho',
-            tension: 0.3
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        scales: {
-          ejeIzquierdo: { type: 'linear', position: 'left', title: { display: true, text: 'Temperatura (°C)' } },
-          ejeDerecho:   { type: 'linear', position: 'right', title: { display: true, text: 'Presión (hPa)' }, grid: { drawOnChartArea: false } }
-        }
+    const pasoX = datos.length > 1 ? (W - padX * 2) / (datos.length - 1) : 0;
+
+    // Función auxiliar para trazar cada serie
+    function trazarLinea(valores, minV, maxV, color) {
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      valores.forEach((v, idx) => {
+        const x = padX + idx * pasoX;
+        const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // Dibujar puntos
+      valores.forEach((v, idx) => {
+        const x = padX + idx * pasoX;
+        const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    trazarLinea(temps, minT, maxT, "#dc2626");
+    trazarLinea(press, minP, maxP, "#2563eb");
+
+    // Etiquetas de hora abajo
+    ctx.fillStyle = "#64748b";
+    datos.forEach((d, idx) => {
+      if (idx === 0 || idx === datos.length - 1 || idx % Math.ceil(datos.length / 6) === 0) {
+        const fTexto = d.fecha_hora.endsWith("Z") ? d.fecha_hora : d.fecha_hora + "Z";
+        const f = new Date(fTexto);
+        const horaStr = f.getHours().toString().padStart(2, '0') + ":" + f.getMinutes().toString().padStart(2, '0');
+        const x = padX + idx * pasoX;
+        ctx.fillText(horaStr, x - 15, H - 8);
       }
     });
   }
