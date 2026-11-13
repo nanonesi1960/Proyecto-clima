@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monitor de Clima ESP32</title>
- <script>
-  document.write('<scr' + 'ipt src="https://' + 'cdn.jsdelivr.net' + '/npm/chart.js@4.4.1/dist/chart.umd.min.js"></scr' + 'ipt>');
-</script>
+ 
   <style>
     body { font-family: Arial, sans-serif; background-color: #eef2f6; color: #333; margin: 0; padding: 20px; }
     .caja-principal { max-width: 900px; margin: 0 auto; }
@@ -58,7 +56,8 @@
     <canvas id="miGrafico"></canvas>
   </div>
 </div>
-
+<script>
+  document.write('<scr' + 'ipt src="https://' + 'cdn.jsdelivr.net' + '/npm/chart.js@4.4.1/dist/chart.umd.min.js"></scr' + 'ipt>');
 <script>
   const DOMINIO = "proyecto-clima-0cob.onrender.com";
 const URL_SERVIDOR = "https://" + DOMINIO + "/api/lecturas";
