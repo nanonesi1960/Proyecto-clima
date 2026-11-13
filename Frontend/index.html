@@ -4,10 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monitor de Clima ESP32</title>
-  <!-- Librería gratuita para dibujar gráficos -->
   <script src="https://jsdelivr.net"></script>
-  
-  <!-- ESTILOS VISUALES (CSS) -->
   <style>
     body { font-family: Arial, sans-serif; background-color: #eef2f6; color: #333; margin: 0; padding: 20px; }
     .caja-principal { max-width: 900px; margin: 0 auto; }
@@ -15,25 +12,20 @@
     select, button { padding: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; }
     button { background-color: #0066cc; color: white; border: none; cursor: pointer; }
     button:hover { background-color: #0052a3; }
-    
-    /* Diseño de las 3 tarjetas de arriba */
     .fila-tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
     .tarjeta { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
     .tarjeta h3 { margin: 0; font-size: 14px; color: #666; }
     .tarjeta .numero { font-size: 36px; font-weight: bold; margin-top: 10px; color: #111; }
-    
-    /* Caja blanca del gráfico */
     .caja-grafico { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
   </style>
 </head>
 <body>
 
 <div class="caja-principal">
-  <!-- TÍTULO Y CONTROLES -->
   <div class="encabezado">
     <div>
       <h1 style="margin: 0;">Estación Meteorológica</h1>
-      <small id="mensajeEstado" style="color: #666;">Esperando conexión...</small>
+      <small id="mensajeEstado" style="color: #666;">Iniciando...</small>
     </div>
     <div>
       <select id="menuEstacion" onchange="pedirDatosAlServidor()">
@@ -45,7 +37,6 @@
     </div>
   </div>
 
-  <!-- TARJETAS CON LOS ÚLTIMOS VALORES -->
   <div class="fila-tarjetas">
     <div class="tarjeta">
       <h3>TEMPERATURA ACTUAL</h3>
@@ -61,68 +52,61 @@
     </div>
   </div>
 
-  <!-- LIENZO DONDE SE DIBUJA EL GRÁFICO -->
   <div class="caja-grafico">
     <canvas id="miGrafico"></canvas>
   </div>
 </div>
 
-<!-- LÓGICA DE LA PÁGINA (JAVASCRIPT) -->
 <script>
-  // ¡ATENCIÓN! Aquí deberás poner la dirección real que te dé Render en el Paso 4
-  const URL_SERVIDOR = "https://proyecto-clima-0cob.onrender.com/api/lecturas";
-  
-  let graficoActual = null; // Variable para guardar el gráfico en memoria
+  const URL_SERVIDOR = "https://onrender.com";
+  let graficoActual = null;
 
-  // Función principal que va a buscar los datos a Render
   async function pedirDatosAlServidor() {
     const estacionElegida = document.getElementById("menuEstacion").value;
     const estado = document.getElementById("mensajeEstado");
-    estado.textContent = "Buscando datos nuevos...";
+    estado.textContent = "Conectando con Render...";
 
     try {
-      // Armar la dirección web con o sin filtro de estación
       let direccion = URL_SERVIDOR + "?limite=50";
       if (estacionElegida !== "") {
         direccion += "&estacion=" + estacionElegida;
       }
 
-      // Hacer la llamada por internet al servidor Python
       const respuesta = await fetch(direccion);
+      if (!respuesta.ok) {
+        throw new Error("El servidor respondió con código " + respuesta.status);
+      }
+
       const listaDatos = await respuesta.json();
 
-      // Si la base de datos todavía está vacía
       if (listaDatos.length === 0) {
-        estado.textContent = "Conectado, pero aún no hay datos enviados por el ESP32.";
+        estado.textContent = "Conectado, pero no hay datos para esta selección.";
         return;
       }
 
-      // Tomar el último elemento de la lista (el más reciente)
       const ultimoDato = listaDatos[listaDatos.length - 1];
 
-      // Escribir los números en las tarjetas HTML
       document.getElementById("textoTemp").textContent = ultimoDato.temperatura.toFixed(1) + " °C";
       document.getElementById("textoPres").textContent = ultimoDato.presion.toFixed(1) + " hPa";
       
-      // Convertir la hora del servidor a la hora local de tu computadora
-      const fecha = new Date(ultimoDato.fecha_hora);
+      // Asegurar que la fecha se interprete como UTC agregando 'Z' si no la tiene
+      const fechaTexto = ultimoDato.fecha_hora.endsWith("Z") ? ultimoDato.fecha_hora : ultimoDato.fecha_hora + "Z";
+      const fecha = new Date(fechaTexto);
       document.getElementById("textoHora").textContent = fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
       
-      estado.textContent = "Última lectura recibida de: " + ultimoDato.estacion_id;
-
-      // Llamar a la función que dibuja las líneas
+      estado.textContent = "En línea • Última lectura de " + ultimoDato.estacion_id + " (" + listaDatos.length + " registros cargados)";
       actualizarGrafico(listaDatos);
 
     } catch (error) {
-      estado.textContent = "Error: No se pudo conectar con el servidor.";
-      console.error(error);
+      estado.textContent = "Detalle del error: " + error.message;
+      console.error("Fallo detallado:", error);
     }
   }
 
   function actualizarGrafico(datos) {
-    // Preparar las listas de horas, temperaturas y presiones
     const horas = datos.map(item => {
-      const f = new Date(item.fecha_hora);
+      const fTexto = item.fecha_hora.endsWith("Z") ? item.fecha_hora : item.fecha_hora + "Z";
+      const f = new Date(fTexto);
       return f.getHours().toString().padStart(2, '0') + ":" + f.getMinutes().toString().padStart(2, '0');
     });
     const temperaturas = datos.map(item => item.temperatura);
@@ -130,12 +114,10 @@
 
     const lienzo = document.getElementById("miGrafico").getContext("2d");
 
-    // Si ya había un gráfico dibujado antes, borrarlo para dibujar el nuevo encima
     if (graficoActual !== null) {
       graficoActual.destroy();
     }
 
-    // Crear el gráfico nuevo
     graficoActual = new Chart(lienzo, {
       type: 'line',
       data: {
@@ -144,16 +126,18 @@
           {
             label: 'Temperatura (°C)',
             data: temperaturas,
-            borderColor: 'red',
-            backgroundColor: 'rgba(255, 0, 0, 0.1)',
-            yAxisID: 'ejeIzquierdo'
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            yAxisID: 'ejeIzquierdo',
+            tension: 0.3
           },
           {
             label: 'Presión (hPa)',
             data: presiones,
-            borderColor: 'blue',
-            backgroundColor: 'rgba(0, 0, 255, 0.1)',
-            yAxisID: 'ejeDerecho'
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            yAxisID: 'ejeDerecho',
+            tension: 0.3
           }
         ]
       },
@@ -167,7 +151,6 @@
     });
   }
 
-  // Ejecutar apenas se abre la página y repetir automáticamente cada 60 segundos (60000 ms)
   pedirDatosAlServidor();
   setInterval(pedirDatosAlServidor, 60000);
 </script>
