@@ -11,9 +11,11 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 # 2. CONECTAR A LA BASE DE DATOS
 # Busca la dirección de la base de datos en Render. Si no la encuentra, crea un archivo local.
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./estaciones.db")
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
 
 connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
