@@ -58,7 +58,9 @@
 </div>
 
 <script>
-  const URL_SERVIDOR = "https://onrender.com";
+  const DOMINIO = "proyecto-clima-0cob.onrender.com";
+const URL_SERVIDOR = "https://" + DOMINIO + "/api/lecturas";
+
   let graficoActual = null;
 
   async function pedirDatosAlServidor() {
