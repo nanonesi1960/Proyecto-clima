@@ -5,10 +5,9 @@ from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
-# 1. DEFINIR LA VARIABLE DATABASE_URL Y ADAPTARLA PARA PSYCOPG
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./estaciones.db")
 
 if DATABASE_URL.startswith("postgres://"):
@@ -23,35 +22,42 @@ Base = declarative_base()
 
 API_KEY_VALIDA = os.getenv("API_KEY", "mi_clave_secreta_1234")
 
-# 2. TABLA EN BASE DE DATOS
 class RegistroDB(Base):
     __tablename__ = "lecturas"
     id = Column(Integer, primary_key=True, index=True)
     estacion_id = Column(String, index=True, nullable=False)
     temperatura = Column(Float, nullable=False)
     presion = Column(Float, nullable=False)
+    humedad = Column(Float, nullable=True) # Nueva columna para el GY-21
     fecha_hora = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 Base.metadata.create_all(bind=engine)
 
-# 3. ESQUEMAS DE DATOS JSON
+# Agregar automáticamente la columna 'humedad' si la tabla ya existía de antes
+with engine.begin() as conn:
+    try:
+        conn.execute(text("ALTER TABLE lecturas ADD COLUMN humedad FLOAT;"))
+    except Exception:
+        pass # Si la columna ya existe, ignora el aviso y sigue
+
 class LecturaEntrada(BaseModel):
     estacion_id: str = Field(..., min_length=2, max_length=50)
     temperatura: float = Field(..., ge=-50.0, le=100.0)
-    presion: float = Field(..., ge=300.0, le=1200.0)
+    presion: float = Field(..., ge=0.0, le=1200.0)
+    humedad: Optional[float] = Field(None, ge=0.0, le=100.0)
 
 class LecturaSalida(BaseModel):
     id: int
     estacion_id: str
     temperatura: float
     presion: float
+    humedad: Optional[float] = None
     fecha_hora: datetime
 
     class Config:
         from_attributes = True
 
-# 4. APLICACIÓN FASTAPI
-app = FastAPI(title="API Estaciones Clima")
+app = FastAPI(title="API Estaciones Clima + Humedad")
 
 app.add_middleware(
     CORSMiddleware,
@@ -68,10 +74,9 @@ def get_db():
     finally:
         db.close()
 
-# 5. RUTAS DE LA API
 @app.get("/")
 def inicio():
-    return {"mensaje": "Servidor activo y conectado a la base de datos"}
+    return {"mensaje": "Servidor activo con soporte de Temperatura, Presion y Humedad"}
 
 @app.post("/api/lecturas", response_model=LecturaSalida, status_code=201)
 def guardar_dato(datos: LecturaEntrada, x_api_key: str = Header(None), db: Session = Depends(get_db)):
@@ -81,7 +86,8 @@ def guardar_dato(datos: LecturaEntrada, x_api_key: str = Header(None), db: Sessi
     nueva_fila = RegistroDB(
         estacion_id=datos.estacion_id,
         temperatura=datos.temperatura,
-        presion=datos.presion
+        presion=datos.presion,
+        humedad=datos.humedad
     )
     db.add(nueva_fila)
     db.commit()
@@ -89,7 +95,7 @@ def guardar_dato(datos: LecturaEntrada, x_api_key: str = Header(None), db: Sessi
     return nueva_fila
 
 @app.get("/api/lecturas", response_model=List[LecturaSalida])
-def leer_datos(estacion: Optional[str] = None, limite: int = 50, db: Session = Depends(get_db)):
+def leer_datos(estacion: Optional[str] = None, limite: int = 100, db: Session = Depends(get_db)):
     consulta = db.query(RegistroDB)
     if estacion:
         consulta = consulta.filter(RegistroDB.estacion_id == estacion)
