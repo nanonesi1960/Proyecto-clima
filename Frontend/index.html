@@ -18,13 +18,19 @@
     .alerta-box { display: none; background-color: #fee2e2; border: 2px solid #ef4444; color: #991b1b; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; text-align: center; font-size: 16px; }
 
     .fila-tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 15px; margin-bottom: 20px; }
-    .tarjeta { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; transition: 0.3s; }
+    .tarjeta { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
     .tarjeta.peligro { background-color: #fef2f2; border: 2px solid #ef4444; }
     .tarjeta h3 { margin: 0; font-size: 13px; color: #666; }
     .tarjeta .numero { font-size: 32px; font-weight: bold; margin-top: 10px; color: #111; }
-    .caja-grafico { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+    .caja-grafico { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
     .leyenda { display: flex; justify-content: center; gap: 25px; margin-bottom: 10px; font-weight: bold; font-size: 14px; flex-wrap: wrap; }
     canvas { width: 100%; height: 340px; display: block; }
+
+    .caja-tabla { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: center; }
+    th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+    th { background-color: #f8fafc; color: #475569; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -42,7 +48,7 @@
         <option value="EST-02">Estación 02 (EST-02)</option>
       </select>
       <button onclick="pedirDatosAlServidor()">Actualizar</button>
-      <button class="btn-excel" onclick="descargarCSV()">Descargar Excel (CSV)</button>
+      <button class="btn-excel" onclick="descargarCSV()">Descargar CSV</button>
     </div>
   </div>
 
@@ -75,16 +81,34 @@
     </div>
     <canvas id="miGrafico" width="880" height="340"></canvas>
   </div>
+
+  <div class="caja-tabla">
+    <h3 style="margin-top: 0; color: #334155;">Últimas mediciones registradas</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha y Hora</th>
+          <th>Estación</th>
+          <th>Temperatura (°C)</th>
+          <th>Humedad (%)</th>
+          <th>Presión (hPa)</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="5">Cargando datos...</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <script>
- const DOMINIO = "proyecto-clima-0cob" + ".onrender" + ".com";
+  const DOMINIO = "proyecto-clima-0cob" + ".onrender" + ".com";
   const URL_SERVIDOR = "https://" + DOMINIO + "/api/lecturas";
 
   const TEMP_MAXIMA = 30.0;
   const TEMP_MINIMA = 5.0;
   const PRES_MINIMA = 1005.0;
-  const HUM_MAXIMA  = 85.0; // Alerta si la humedad supera 85%
+  const HUM_MAXIMA  = 85.0;
 
   let datosEnMemoria = [];
 
@@ -94,7 +118,7 @@
     estado.textContent = "Conectando con Render...";
 
     try {
-      let direccion = URL_SERVIDOR + "?limite=100";
+      let direccion = URL_SERVIDOR + "?limite=50";
       if (estacionElegida !== "") {
         direccion += "&estacion=" + estacionElegida;
       }
@@ -126,10 +150,30 @@
       
       verificarAlertas(ultimoDato);
       dibujarGraficoNativo(listaDatos);
+      actualizarTabla(listaDatos);
 
     } catch (error) {
       estado.textContent = "Detalle del error: " + error.message;
     }
+  }
+
+  function actualizarTabla(datos) {
+    const tbody = document.getElementById("cuerpoTabla");
+    tbody.innerHTML = "";
+    const ultimos = [...datos].reverse().slice(0, 15);
+    ultimos.forEach(d => {
+      const fTexto = d.fecha_hora.endsWith("Z") ? d.fecha_hora : d.fecha_hora + "Z";
+      const fechaLocal = new Date(fTexto).toLocaleString("es-AR");
+      const humStr = (d.humedad !== null && d.humedad !== undefined) ? d.humedad.toFixed(1) + " %" : "--";
+      const fila = `<tr>
+        <td>${fechaLocal}</td>
+        <td>${d.estacion_id}</td>
+        <td style="color:#dc2626; font-weight:bold;">${d.temperatura.toFixed(1)} °C</td>
+        <td style="color:#16a34a; font-weight:bold;">${humStr}</td>
+        <td style="color:#2563eb; font-weight:bold;">${d.presion.toFixed(1)} hPa</td>
+      </tr>`;
+      tbody.innerHTML += fila;
+    });
   }
 
   function verificarAlertas(dato) {
@@ -144,20 +188,20 @@
     cardHum.classList.remove("peligro");
 
     if (dato.temperatura > TEMP_MAXIMA) {
-      mensajes.push("⚠️ TEMPERATURA ALTA: " + dato.temperatura.toFixed(1) + " °C");
+      mensajes.push("TEMPERATURA ALTA: " + dato.temperatura.toFixed(1) + " °C");
       cardTemp.classList.add("peligro");
     } else if (dato.temperatura < TEMP_MINIMA) {
-      mensajes.push("❄️ TEMPERATURA BAJA: " + dato.temperatura.toFixed(1) + " °C");
+      mensajes.push("TEMPERATURA BAJA: " + dato.temperatura.toFixed(1) + " °C");
       cardTemp.classList.add("peligro");
     }
 
     if (dato.humedad !== null && dato.humedad > HUM_MAXIMA) {
-      mensajes.push("💧 HUMEDAD MUY ALTA: " + dato.humedad.toFixed(1) + " %");
+      mensajes.push("HUMEDAD MUY ALTA: " + dato.humedad.toFixed(1) + " %");
       cardHum.classList.add("peligro");
     }
 
     if (dato.presion < PRES_MINIMA) {
-      mensajes.push("🌧️ BAJA PRESIÓN: " + dato.presion.toFixed(1) + " hPa");
+      mensajes.push("BAJA PRESIÓN: " + dato.presion.toFixed(1) + " hPa");
       cardPres.classList.add("peligro");
     }
 
@@ -200,75 +244,67 @@
     const H = canvas.height;
     const padX = 55;
     const padY = 30;
-
     ctx.clearRect(0, 0, W, H);
-
     const temps = datos.map(d => d.temperatura);
     const press = datos.map(d => d.presion);
     const hums  = datos.map(d => (d.humedad !== null && d.humedad !== undefined) ? d.humedad : null);
-
     const minT = Math.min(...temps) - 0.5;
     const maxT = Math.max(...temps) + 0.5;
     const minP = Math.min(...press) - 0.5;
     const maxP = Math.max(...press) + 0.5;
-
     ctx.strokeStyle = "#e2e8f0";
     ctx.lineWidth = 1;
     ctx.font = "12px Arial";
     for (let i = 0; i <= 4; i++) {
-      const y = padY + (i * (H - padY * 2)) / 4;
-      ctx.beginPath();
-      ctx.moveTo(padX, y);
-      ctx.lineTo(W - padX, y);
-      ctx.stroke();
-
-      const valT = (maxT - (i * (maxT - minT)) / 4).toFixed(1);
-      const valP = (maxP - (i * (maxP - minP)) / 4).toFixed(1);
-      ctx.fillStyle = "#dc2626";
-      ctx.fillText(valT + "°", 6, y + 4);
-      ctx.fillStyle = "#2563eb";
-      ctx.fillText(valP, W - padX + 6, y + 4);
+    const y = padY + (i * (H - padY * 2)) / 4;
+    ctx.beginPath();
+    ctx.moveTo(padX, y);
+    ctx.lineTo(W - padX, y);
+    ctx.stroke();
+    const valT = (maxT - (i * (maxT - minT)) / 4).toFixed(1);
+    const valP = (maxP - (i * (maxP - minP)) / 4).toFixed(1);
+    ctx.fillStyle = "#dc2626";
+    ctx.fillText(valT + "°", 6, y + 4);
+    ctx.fillStyle = "#2563eb";
+    ctx.fillText(valP, W - padX + 6, y + 4);
     }
-
     const pasoX = datos.length > 1 ? (W - padX * 2) / (datos.length - 1) : 0;
-
     function trazarLinea(valores, minV, maxV, color) {
-      ctx.strokeStyle = color;
-      ctx.fillStyle = color;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      let iniciada = false;
-      valores.forEach((v, idx) => {
-        if (v === null) return;
-        const x = padX + idx * pasoX;
-        const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
-        if (!iniciada) { ctx.moveTo(x, y); iniciada = true; }
-        else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-
-      valores.forEach((v, idx) => {
-      if (v === null) return;
-const x = padX + idx * pasoX;
-const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
-ctx.beginPath();
-ctx.arc(x, y, 4, 0, Math.PI * 2);
-ctx.fill();
-});
-}
-trazarLinea(temps, minT, maxT, "#dc2626");
-trazarLinea(hums, 0, 100, "#16a34a"); // Escala fija 0% a 100% para humedad
-trazarLinea(press, minP, maxP, "#2563eb");
-ctx.fillStyle = "#64748b";
-datos.forEach((d, idx) => {
-if (idx === 0 || idx === datos.length - 1 || idx % Math.ceil(datos.length / 6) === 0) {
-const fTexto = d.fecha_hora.endsWith("Z") ? d.fecha_hora : d.fecha_hora + "Z";
-const f = new Date(fTexto);
-const horaStr = f.getHours().toString().padStart(2, '0') + ":" + f.getMinutes().toString().padStart(2, '0');
-const x = padX + idx * pasoX;
-ctx.fillText(horaStr, x - 15, H - 8);
-}
-});
-}
-pedirDatosAlServidor();
-setInterval(pedirDatosAlServidor, 60000);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    let iniciada = false;
+    valores.forEach((v, idx) => {
+    if (v === null) return;
+    const x = padX + idx * pasoX;
+    const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
+    if (!iniciada) { ctx.moveTo(x, y); iniciada = true; }
+    else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    valores.forEach((v, idx) => {
+    if (v === null) return;
+    const x = padX + idx * pasoX;
+    const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    });
+    }
+    trazarLinea(temps, minT, maxT, "#dc2626");
+    trazarLinea(hums, 0, 100, "#16a34a");
+    trazarLinea(press, minP, maxP, "#2563eb");
+    ctx.fillStyle = "#64748b";
+    datos.forEach((d, idx) => {
+    if (idx === 0 || idx === datos.length - 1 || idx % Math.ceil(datos.length / 6) === 0) {
+    const fTexto = d.fecha_hora.endsWith("Z") ? d.fecha_hora : d.fecha_hora + "Z";
+    const f = new Date(fTexto);
+    const horaStr = f.getHours().toString().padStart(2, '0') + ":" + f.getMinutes().toString().padStart(2, '0');
+    const x = padX + idx * pasoX;
+    ctx.fillText(horaStr, x - 15, H - 8);
+    }
+    });
+    }
+    pedirDatosAlServidor();
+    setInterval(pedirDatosAlServidor, 60000);
