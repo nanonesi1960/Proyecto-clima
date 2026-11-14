@@ -197,6 +197,11 @@
 
     if (dato.humedad !== null && dato.humedad > HUM_MAXIMA) {
       mensajes.push("HUMEDAD MUY ALTA: " + dato.humedad.toFixed(1) + " %");
+        cardTemp.classList.add("peligro");
+    }
+
+    if (dato.humedad !== null && dato.humedad > HUM_MAXIMA) {
+      mensajes.push("HUMEDAD MUY ALTA: " + dato.humedad.toFixed(1) + " %");
       cardHum.classList.add("peligro");
     }
 
@@ -244,67 +249,83 @@
     const H = canvas.height;
     const padX = 55;
     const padY = 30;
+
     ctx.clearRect(0, 0, W, H);
+
     const temps = datos.map(d => d.temperatura);
     const press = datos.map(d => d.presion);
     const hums  = datos.map(d => (d.humedad !== null && d.humedad !== undefined) ? d.humedad : null);
+
     const minT = Math.min(...temps) - 0.5;
     const maxT = Math.max(...temps) + 0.5;
     const minP = Math.min(...press) - 0.5;
     const maxP = Math.max(...press) + 0.5;
+
     ctx.strokeStyle = "#e2e8f0";
     ctx.lineWidth = 1;
     ctx.font = "12px Arial";
     for (let i = 0; i <= 4; i++) {
-    const y = padY + (i * (H - padY * 2)) / 4;
-    ctx.beginPath();
-    ctx.moveTo(padX, y);
-    ctx.lineTo(W - padX, y);
-    ctx.stroke();
-    const valT = (maxT - (i * (maxT - minT)) / 4).toFixed(1);
-    const valP = (maxP - (i * (maxP - minP)) / 4).toFixed(1);
-    ctx.fillStyle = "#dc2626";
-    ctx.fillText(valT + "°", 6, y + 4);
-    ctx.fillStyle = "#2563eb";
-    ctx.fillText(valP, W - padX + 6, y + 4);
+      const y = padY + (i * (H - padY * 2)) / 4;
+      ctx.beginPath();
+      ctx.moveTo(padX, y);
+      ctx.lineTo(W - padX, y);
+      ctx.stroke();
+
+      const valT = (maxT - (i * (maxT - minT)) / 4).toFixed(1);
+      const valP = (maxP - (i * (maxP - minP)) / 4).toFixed(1);
+      ctx.fillStyle = "#dc2626";
+      ctx.fillText(valT + "°", 6, y + 4);
+      ctx.fillStyle = "#2563eb";
+      ctx.fillText(valP, W - padX + 6, y + 4);
     }
+
     const pasoX = datos.length > 1 ? (W - padX * 2) / (datos.length - 1) : 0;
+
     function trazarLinea(valores, minV, maxV, color) {
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    let iniciada = false;
-    valores.forEach((v, idx) => {
-    if (v === null) return;
-    const x = padX + idx * pasoX;
-    const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
-    if (!iniciada) { ctx.moveTo(x, y); iniciada = true; }
-    else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    valores.forEach((v, idx) => {
-    if (v === null) return;
-    const x = padX + idx * pasoX;
-    const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
-    ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    });
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      let iniciada = false;
+      valores.forEach((v, idx) => {
+        if (v === null) return;
+        const x = padX + idx * pasoX;
+        const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
+        if (!iniciada) { ctx.moveTo(x, y); iniciada = true; }
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      valores.forEach((v, idx) => {
+        if (v === null) return;
+        const x = padX + idx * pasoX;
+        const y = H - padY - ((v - minV) / (maxV - minV)) * (H - padY * 2);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
     }
+
     trazarLinea(temps, minT, maxT, "#dc2626");
     trazarLinea(hums, 0, 100, "#16a34a");
     trazarLinea(press, minP, maxP, "#2563eb");
+
     ctx.fillStyle = "#64748b";
     datos.forEach((d, idx) => {
-    if (idx === 0 || idx === datos.length - 1 || idx % Math.ceil(datos.length / 6) === 0) {
-    const fTexto = d.fecha_hora.endsWith("Z") ? d.fecha_hora : d.fecha_hora + "Z";
-    const f = new Date(fTexto);
-    const horaStr = f.getHours().toString().padStart(2, '0') + ":" + f.getMinutes().toString().padStart(2, '0');
-    const x = padX + idx * pasoX;
-    ctx.fillText(horaStr, x - 15, H - 8);
-    }
+      if (idx === 0 || idx === datos.length - 1 || idx % Math.ceil(datos.length / 6) === 0) {
+        const fTexto = d.fecha_hora.endsWith("Z") ? d.fecha_hora : d.fecha_hora + "Z";
+        const f = new Date(fTexto);
+        const horaStr = f.getHours().toString().padStart(2, '0') + ":" + f.getMinutes().toString().padStart(2, '0');
+        const x = padX + idx * pasoX;
+        ctx.fillText(horaStr, x - 15, H - 8);
+      }
     });
-    }
-    pedirDatosAlServidor();
-    setInterval(pedirDatosAlServidor, 60000);
+  }
+
+  pedirDatosAlServidor();
+  setInterval(pedirDatosAlServidor, 60000);
+</script>
+
+</body>
+</html>
+
